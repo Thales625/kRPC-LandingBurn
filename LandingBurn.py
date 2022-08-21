@@ -1,9 +1,11 @@
 import krpc
-import numpy as np
-from time import perf_counter, sleep
+from time import sleep
+from math import radians, sin, sqrt
+from Simulation import Simulation
+
 
 class LandingBurn:
-    def __init__(self, vessel=None, end_function=None):
+    def __init__(self, vessel=None):
         self.conn = krpc.connect('LandingBurn')
         self.space_center = self.conn.space_center
         self.vessel = self.space_center.active_vessel if vessel == None else vessel
@@ -23,9 +25,6 @@ class LandingBurn:
         self.final_speed = -2
         self.hover_altitude = 5
         self.final_burn = False
-        self.dt = 0.1
-        self.S = np.array([0])
-        self.V = np.array([0])
 
         # Initializing
         self.vessel.control.throttle = 0
@@ -39,42 +38,19 @@ class LandingBurn:
             self.aim_vessel(self.vertical_speed())
 
         # Propriedades do Corpo
-        self.rb = self.body.equatorial_radius
-        self.gm = self.body.gravitational_parameter
-        self.atm = self.body.has_atmosphere
         self.surface_gravity = self.body.surface_gravity
 
         # Propriedade do Foguete
-        self.Cd = 0.47
-        self.r = self.rocket_radius()
-        self.A = np.pi * self.r**2
         self.gears_delay = 4 /2
-        self.m0 = self.vessel.mass
-
+        
         # Thrust de acordo com ângulo de montagem do motor
         thrust = 0
         for engine in self.vessel.parts.engines:
             if engine.active:
                 thrust += engine.available_thrust * engine.part.direction(self.vessel.reference_frame)[1]
 
-        self.aeng0 = (thrust/self.m0)
-        if self.surface_gravity+2 > self.aeng0:
-            self.aeng0 = self.surface_gravity+2
-            print('Motor muito fraco! -> Mínimo TEP aplicado')
-        elif self.aeng0 > self.surface_gravity*4:
-            self.aeng0 = self.surface_gravity*4
-            print('Motor muito forte! -> Limite de TEP aplicado')
-
-
-        print(f'Raio do foguete: {self.r:.2f} metros')
-        print('Iniciando Cálculos...')
-        alt_final = self.altitude()
-        t0 = perf_counter()
-        while self.S[-1] < alt_final: # Talvez usar Runge Kutta
-            self.V = np.append(self.V, self.V[-1] - self.dVdt())
-            self.S = np.append(self.S, self.S[-1] - self.V[-1] * self.dt)
-            #print(f'{min((S[-1]/alt_final)*100, 100):.0f}%')
-        print(f'Cálculos concluídos em: {perf_counter() - t0:.1f} segundos')
+        # Simulation
+        self.simulation = Simulation(self.rocket_radius(), self.vessel.mass, self.body.gravitational_parameter, thrust, self.altitude(), self.body)
 
         while True:
             sleep(0.01)
@@ -105,7 +81,7 @@ class LandingBurn:
             if vert_speed < 0 and pitch > 0:
                 if self.final_burn:
                     self.vessel.gear = True
-                    self.vessel.control.throttle = (self.surface_gravity + (self.final_speed - vert_speed)*2) / (aeng * np.sin(np.radians(pitch)))
+                    self.vessel.control.throttle = (self.surface_gravity + (self.final_speed - vert_speed)*2) / (aeng * sin(radians(pitch)))
                 else:
                     alt = self.altitude()
 
@@ -114,16 +90,13 @@ class LandingBurn:
                     elif self.time_fall(-.5 * self.surface_gravity, vert_speed, alt) <= self.gears_delay:
                         self.vessel.control.gear = True
 
-                    target_speed = np.interp(alt-self.hover_altitude, self.S, self.V)
+                    target_speed = self.simulation.get_speed(alt-self.hover_altitude)
                     delta_speed = target_speed + self.mag_speed()
 
-                    self.vessel.control.throttle = (self.surface_gravity + delta_speed*10) / (aeng * np.sin(np.radians(pitch)))
+                    self.vessel.control.throttle = (self.surface_gravity + delta_speed*10) / (aeng * sin(radians(pitch)))
                     #print(f'{delta_speed:.2f}')
             else:
                 self.vessel.control.throttle = 0
-        
-        if end_function is not None:
-            end_function()
 
 
     def rocket_radius(self):
@@ -133,7 +106,7 @@ class LandingBurn:
         return abs(size)/2
 
     def time_fall(self, a, v, h):
-        d = np.sqrt((v * v) - 4 * a * h)
+        d = sqrt((v * v) - 4 * a * h)
         result_1 = (-v + d) / (2 * a)
         result_2 = (-v - d) / (2 * a)
         return max(result_1, result_2)
@@ -149,15 +122,6 @@ class LandingBurn:
 
     def altitude(self):
         return max(0, self.surface_altitude() + self.vessel.bounding_box(self.surface_ref)[0][0])
-
-    def ag(self, alt):
-        return self.gm / (self.rb+alt)**2
-
-    def dVdt(self):
-        accel_net = self.aeng0 - self.ag(self.S[-1])
-        if self.atm: 
-            accel_net += (self.body.density_at(float(self.S[-1]))*self.Cd*self.A*self.V[-1]**2) / (2*self.m0)
-        return accel_net * self.dt
     
 
 if __name__ == '__main__':
