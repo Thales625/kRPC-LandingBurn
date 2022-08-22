@@ -15,6 +15,7 @@ class LandingBurn:
         self.flight = self.vessel.flight(self.orbit_ref)
 
         # Streams
+        self.mass = self.conn.add_stream(getattr, self.vessel, "mass")
         self.velocity = self.conn.add_stream(getattr, self.flight, "velocity")
         self.vertical_speed = self.conn.add_stream(getattr, self.flight, "vertical_speed")
         self.mag_speed = self.conn.add_stream(getattr, self.flight, "speed")
@@ -22,6 +23,7 @@ class LandingBurn:
         self.pitch = self.conn.add_stream(getattr, self.vessel.flight(self.surface_ref), "pitch")
 
         # Propriedade Computacional
+        self.eng_threshold = 1
         self.final_speed = -2
         self.hover_altitude = 5
         self.final_burn = False
@@ -44,13 +46,13 @@ class LandingBurn:
         self.gears_delay = 4 /2
         
         # Thrust de acordo com ângulo de montagem do motor
-        thrust = 0
+        self.thrust = 0
         for engine in self.vessel.parts.engines:
             if engine.active:
-                thrust += engine.available_thrust * engine.part.direction(self.vessel.reference_frame)[1]
+                self.thrust += engine.available_thrust * engine.part.direction(self.vessel.reference_frame)[1]
 
         # Simulation
-        self.simulation = Simulation(self.rocket_radius(), self.vessel.mass, self.body.gravitational_parameter, thrust, self.altitude(), self.body)
+        self.simulation = Simulation(self.rocket_radius(), self.mass(), self.thrust*self.eng_threshold, self.altitude(), self.final_speed, self.body)
 
         while True:
             sleep(0.01)
@@ -81,7 +83,7 @@ class LandingBurn:
             if vert_speed < 0 and pitch > 0:
                 if self.final_burn:
                     self.vessel.gear = True
-                    self.vessel.control.throttle = (self.surface_gravity + (self.final_speed - vert_speed)*2) / (aeng * sin(radians(pitch)))
+                    self.vessel.control.throttle = self.throttle_control(self.final_speed - vert_speed, pitch, 5)
                 else:
                     alt = self.altitude()
 
@@ -93,11 +95,15 @@ class LandingBurn:
                     target_speed = self.simulation.get_speed(alt-self.hover_altitude)
                     delta_speed = target_speed + self.mag_speed()
 
-                    self.vessel.control.throttle = (self.surface_gravity + delta_speed*10) / (aeng * sin(radians(pitch)))
+                    self.vessel.control.throttle = self.throttle_control(delta_speed, pitch, 10)
                     #print(f'{delta_speed:.2f}')
             else:
                 self.vessel.control.throttle = 0
 
+    def throttle_control(self, accel, pitch, factor=1):
+        aeng = self.thrust / self.mass()
+        throttle = (self.surface_gravity + accel*factor) / (aeng * sin(radians(pitch)))
+        return throttle
 
     def rocket_radius(self):
         size = 0.5

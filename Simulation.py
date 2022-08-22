@@ -1,23 +1,27 @@
 import numpy as np
 
 class Simulation():
-    def __init__(self, r, mass, gm, thrust, final_altitude, body, Cd=0.4) -> None:
-        self.dt = 0.1
+    def __init__(self, r, mass, thrust, final_altitude, final_speed, body, Cd=0.4) -> None:
+        self.dt = 0.01
         self.S = np.array([0])
-        self.V = np.array([0])
+        self.V = np.array([final_speed])
 
+        # Rocket Proprieties
         self.r = r # Radius
         self.A = np.pi * self.r**2 # Area
         self.Cd = Cd # Drag Coefficient
         self.m = mass # Initial Mass
+        self.thrust = thrust
+
+        # Body Proprieties
         self.body = body
         self.surface_gravity = self.body.surface_gravity # Surface Gravity
         self.gm = self.body.gravitational_parameter # Gravitational Parameter
         self.rb = self.body.equatorial_radius
         self.atm = self.body.has_atmosphere
         self.final_altitude = final_altitude
-        self.thrust = thrust
 
+        # Thrust limit
         self.aeng = (self.thrust/self.m)
         if self.surface_gravity+2 > self.aeng:
             self.aeng = self.surface_gravity+2
