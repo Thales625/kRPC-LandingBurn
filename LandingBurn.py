@@ -25,7 +25,7 @@ class LandingBurn:
         # Propriedade Computacional
         self.eng_threshold = 1
         self.final_speed = -2
-        self.hover_altitude = 5
+        self.hover_altitude = 30
         self.final_burn = False
 
         # Initializing
