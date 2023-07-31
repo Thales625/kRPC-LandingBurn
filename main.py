@@ -3,8 +3,8 @@ from time import sleep
 from math import sqrt
 
 from sys import path
-path.append('/home/thales/Documentos/Codes/www/Vector')
-from Vector import Vector3
+path.append('D:\Codes\Python\www\Vector')
+from Vector import Vector3, Vector2
 
 from Trajectory import Trajectory
 
@@ -36,19 +36,18 @@ class LandingBurn:
         else:
             self.land_func = land_func
 
-        # body properties
+        # consts
         self.a_g = self.body.surface_gravity
         
         # Params
-        self.gear_delay = 4
         self.tilted_engines = False
+        self.gear_delay = 4
         self.max_twr = 4
         self.final_speed = -2
-        self.final_altitude = 5
+        self.final_altitude = 10
 
         # Trajectory
-        self.trajectory = Trajectory(self.body)
-        self.line = self.drawing.add_line((0, 0, 0), (0, 0, 0), self.body_ref)
+        self.trajectory = Trajectory()
 
         # Initializing
         self.vessel.control.throttle = 0
@@ -68,8 +67,6 @@ class LandingBurn:
             sleep(0.5)
 
         # Initializing Trajectory module
-        self.trajectory.initial_pos = Vector3(self.stream_position_body())
-        self.trajectory.initial_vel = Vector3(self.stream_vel_body())
         self.trajectory.start()
 
         # Thrust de acordo com ângulo de montagem do motor
@@ -95,7 +92,7 @@ class LandingBurn:
             
             a_eng = av_thrust / mass
             eng_threshold = min(self.max_twr * self.a_g / a_eng, 1)
-            a_eng_l = a_eng * eng_threshold
+            a_eng_l = a_eng * eng_threshold * 0.9
             a_net = max(a_eng_l - self.a_g, .1)
             
             target_dir = vel * -1
@@ -106,28 +103,27 @@ class LandingBurn:
             t_burning = sqrt(2*abs(burn_altitude) / a_net)
             t_fall = t_to_burn + t_burning
 
-            #required_dv = t_burning / a_eng # dv = Ve * ln(m0/mf) | dv/Ve = ln(m0/mf) | e^(dv/Ve) = m0/mf  |  m0 = e^(dv/Ve) / mf
+            print(t_fall)
 
-            # update trajectory
-            self.trajectory.initial_pos = Vector3(self.stream_position_body())
-            self.trajectory.initial_vel = Vector3(self.stream_vel_body())
+            #required_dv = t_burning / a_eng # dv = Ve * ln(m0/mf) | dv/Ve = ln(m0/mf) | e^(dv/Ve) = m0/mf  |  m0 = e^(dv/Ve) / mf
 
             # Throttle Controller
             if pitch > 0:
-                #dist = self.trajectory.initial_pos.distance(self.trajectory.land_pos)
-                dist = Vector3(self.space_center.transform_position(tuple(self.trajectory.land_pos), self.body_ref, self.surface_ref)).magnitude()
-                print(dist)
-
-                self.line.start = tuple(self.trajectory.initial_pos)
-                self.line.end = tuple(self.trajectory.land_pos)
-                # print(tuple(self.trajectory.land_pos.magnitude()))
+                if sqrt(vel.y**2 + vel.z**2) > 20:
+                    dist = Vector3(self.stream_position_body()).distance(self.trajectory.land_pos)
+                else:
+                    t_free_fall = (vel.x + sqrt(vel.x**2 + 2*self.a_g*alt)) / self.a_g
+                    dist = Vector3(-alt, vel.y*t_free_fall, vel.z*t_free_fall).magnitude()
+                
+                #print(dist)
                 
                 if alt > self.final_altitude:
                     target_speed = sqrt(self.final_speed**2 + 2*a_net*abs(dist-self.final_altitude))
                     delta_speed = mag_speed - target_speed
-                    throttle = (delta_speed * 15 + self.a_g) / a_eng
+                    #print(delta_speed)
+                    throttle = (delta_speed * 10 + self.a_g) / a_eng
                 else: # Final Burn
-                    target_dir.x *= 40
+                    target_dir.x *= 10
                     delta_speed = self.final_speed - vel.x
                     throttle = (delta_speed * 10 + self.a_g) / a_eng
 
@@ -161,8 +157,7 @@ class LandingBurn:
         self.vessel.control.rcs = False
         self.vessel.auto_pilot.disengage()
 
-        self.trajectory.RUNNING = False
-
+        self.trajectory.end()
         self.conn.close()
 
     def progressive_engine_cut(self):
