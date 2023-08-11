@@ -2,23 +2,27 @@ import krpc
 from time import sleep
 from math import sqrt
 
-from sys import path
-path.append('D:\Codes\Python\www\Vector')
-from Vector import Vector3, Vector2
+from Vector import Vector3
 
 from Trajectory import Trajectory
 
+MULTILANDING = False
+
 class LandingBurn:
-    def __init__(self, vessel=None, land_func=None):
-        self.conn = krpc.connect('LandingBurn')
+    def __init__(self, vessel_tag=None, land_func=None):
+        self.conn = krpc.connect('LandingBurn' + ((': ' + vessel_tag) if vessel_tag else ''))
         self.space_center = self.conn.space_center
-        self.vessel = self.space_center.active_vessel if vessel == None else vessel
+        self.vessel = self.space_center.active_vessel
+        if vessel_tag:
+            for vessel in self.space_center.vessels:
+                if len(vessel.parts.with_tag(vessel_tag)) > 0:
+                    self.vessel = vessel
+                    break
         self.body = self.vessel.orbit.body
         self.body_ref = self.body.reference_frame
         self.surface_ref = self.vessel.surface_reference_frame
         self.flight_body = self.vessel.flight(self.body_ref)
         self.flight_surface = self.vessel.flight(self.surface_ref)
-        self.drawing = self.conn.drawing
 
         # Streams
         self.stream_mass = self.conn.add_stream(getattr, self.vessel, "mass")
@@ -46,16 +50,22 @@ class LandingBurn:
         self.final_speed = -2
         self.final_altitude = 10
 
+        self.line_land = self.conn.drawing.add_line((0, 0, 0), (0, 0, 0), self.body_ref)
+        self.line_land.thickness = 10
+
         # Trajectory
-        self.trajectory = Trajectory()
+        if not MULTILANDING:
+            self.trajectory = Trajectory()
 
         # Initializing
         self.vessel.control.throttle = 0
         self.vessel.control.brakes = True
         self.vessel.control.rcs = True
         self.vessel.auto_pilot.engage()
-        self.vessel.auto_pilot.target_roll = -90
         self.vessel.auto_pilot.reference_frame = self.body_ref
+        self.vessel.auto_pilot.stopping_time = (0.5, 0.5, 0.5)
+        self.vessel.auto_pilot.deceleration_time = (5, 5, 5)
+        self.vessel.auto_pilot.target_roll = 0
 
         # Waiting
         while self.get_velocity().x > 0:
@@ -67,7 +77,7 @@ class LandingBurn:
             sleep(0.5)
 
         # Initializing Trajectory module
-        self.trajectory.start()
+        if not MULTILANDING: self.trajectory.start()
 
         # Thrust de acordo com ângulo de montagem do motor
         self.thrust = 0
@@ -92,7 +102,8 @@ class LandingBurn:
             
             a_eng = av_thrust / mass
             eng_threshold = min(self.max_twr * self.a_g / a_eng, 1)
-            a_eng_l = a_eng * eng_threshold * 0.9
+            a_eng_l = a_eng * eng_threshold
+
             a_net = max(a_eng_l - self.a_g, .1)
             
             target_dir = vel * -1
@@ -103,14 +114,15 @@ class LandingBurn:
             t_burning = sqrt(2*abs(burn_altitude) / a_net)
             t_fall = t_to_burn + t_burning
 
-            print(t_fall)
-
             #required_dv = t_burning / a_eng # dv = Ve * ln(m0/mf) | dv/Ve = ln(m0/mf) | e^(dv/Ve) = m0/mf  |  m0 = e^(dv/Ve) / mf
 
             # Throttle Controller
             if pitch > 0:
-                if sqrt(vel.y**2 + vel.z**2) > 20:
+                if not MULTILANDING and vel.y**2 + vel.z**2 > 800: # 30**2
                     dist = Vector3(self.stream_position_body()).distance(self.trajectory.land_pos)
+                    print(dist)
+                    self.line_land.start = self.stream_position_body()
+                    self.line_land.end = tuple(self.trajectory.land_pos)
                 else:
                     t_free_fall = (vel.x + sqrt(vel.x**2 + 2*self.a_g*alt)) / self.a_g
                     dist = Vector3(-alt, vel.y*t_free_fall, vel.z*t_free_fall).magnitude()
@@ -121,11 +133,11 @@ class LandingBurn:
                     target_speed = sqrt(self.final_speed**2 + 2*a_net*abs(dist-self.final_altitude))
                     delta_speed = mag_speed - target_speed
                     #print(delta_speed)
-                    throttle = (delta_speed * 10 + self.a_g) / a_eng
+                    throttle = (delta_speed*5 + self.a_g) / a_eng
                 else: # Final Burn
-                    target_dir.x *= 10
+                    target_dir.x *= 15
                     delta_speed = self.final_speed - vel.x
-                    throttle = (delta_speed * 10 + self.a_g) / a_eng
+                    throttle = (delta_speed*2 + self.a_g) / a_eng
 
                 self.vessel.control.throttle = throttle
         
@@ -157,7 +169,7 @@ class LandingBurn:
         self.vessel.control.rcs = False
         self.vessel.auto_pilot.disengage()
 
-        self.trajectory.end()
+        if not MULTILANDING: self.trajectory.end()
         self.conn.close()
 
     def progressive_engine_cut(self):
@@ -184,4 +196,9 @@ class LandingBurn:
     
 
 if __name__ == '__main__':
+    if MULTILANDING:
+        from threading import Thread
+
+        Thread(target=LandingBurn, args=['booster1']).start()
+        Thread(target=LandingBurn, args=['booster2']).start()
     LandingBurn()
