@@ -2,6 +2,7 @@ import krpc
 from math import exp, pi, ceil
 from threading import Thread
 from time import sleep
+#from numba import jit
 
 from sys import path
 path.append('D:\Codes\www\Vector')
@@ -57,6 +58,7 @@ class Trajectory:
         
         return self.body.altitude_at_position(pos, self.body_ref) - self.body.surface_height(lat, lon)
 
+    #@jit()
     def rk4(self, pos):
         dist = pos.magnitude()
 
@@ -97,12 +99,21 @@ class Trajectory:
                 self.v.append(self.v[-1] + dv)
                 self.r.append(self.r[-1] + dr)
                 
-                if self.r[-1].magnitude() < self.rb or (step % self.step_check_ground == 0 and self.alt_at_pos(tuple(self.r[-1])) <= 0):
+                # if step % self.step_check_ground == 0 and (self.r[-1].magnitude() < self.rb and self.alt_at_pos(tuple(self.r[-1])) <= 0):
+                # if step % self.step_check_ground == 0 and self.alt_at_pos(tuple(self.r[-1]) <= 0):
+                if step % self.step_check_ground == 0 and (self.r[-1].magnitude() < self.rb and self.alt_at_pos(tuple(self.r[-1])) <= 0):
                     i = -2
-                    while self.alt_at_pos(tuple(self.r[i])) < 0:
+                    alt = self.alt_at_pos(tuple(self.r[i]))
+                    while alt < 0:
                         i -= 1
+                        alt = self.alt_at_pos(tuple(self.r[i]))
 
-                    self.land_pos = self.r[i]
+                    a = self.r[i]
+                    b = self.r[i+1]
+                    
+                    ab_dir = (b-a).normalize()
+                    _ = (-a).normalize()
+                    self.land_pos = a + ab_dir * (alt / _.dot(ab_dir))
                     break
             
             if self.draw_trajectory:
