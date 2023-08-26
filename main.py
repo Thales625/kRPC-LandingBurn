@@ -121,10 +121,10 @@ class LandingBurn:
                 t_hovering = min(self.final_altitude, alt) / abs(self.final_speed)
                 t_fall = t_to_burn + t_burning + t_hovering
 
+                #required_dv = t_burning * a_eng + t_hovering * self.a_g
+
                 #print(f'TF: {t_fall:.1f} | TB: {t_burning:.1f} | TTB: {t_to_burn:.1f} | TH: {t_hovering:.1f}')
-
-                #required_dv = t_burning / a_eng # dv = Ve * ln(m0/mf) | dv/Ve = ln(m0/mf) | e^(dv/Ve) = m0/mf  |  m0 = e^(dv/Ve) / mf
-
+                
                 # Throttle Controller
                 if pitch > 0:
                     if not MULTILANDING and vel.y**2 + vel.z**2 > 900: # hor speed > 30
