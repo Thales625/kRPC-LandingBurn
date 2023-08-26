@@ -52,7 +52,7 @@ class LandingBurn:
         
         # Params
         self.tilted_engines = False
-        self.gear_delay = 4
+        self.gear_delay = 3
         self.max_twr = 4
         self.eng_threshold = .9
         self.final_speed = -1
@@ -115,10 +115,13 @@ class LandingBurn:
                 target_dir.x = abs(target_dir.x)
 
                 burn_altitude = (mag_speed**2 - self.final_speed**2 + 2*self.a_g*alt) / (2 * a_eng_l)
+
                 t_to_burn = (vel.x + sqrt(vel.x**2 + 2*self.a_g*abs(alt - burn_altitude))) / self.a_g
                 t_burning = sqrt(2*abs(burn_altitude) / a_net)
-                #t_hovering = min(self.final_altitude, alt) / abs(self.final_speed)
-                t_fall = t_to_burn + t_burning# + t_hovering
+                t_hovering = min(self.final_altitude, alt) / abs(self.final_speed)
+                t_fall = t_to_burn + t_burning + t_hovering
+
+                #print(f'TF: {t_fall:.1f} | TB: {t_burning:.1f} | TTB: {t_to_burn:.1f} | TH: {t_hovering:.1f}')
 
                 #required_dv = t_burning / a_eng # dv = Ve * ln(m0/mf) | dv/Ve = ln(m0/mf) | e^(dv/Ve) = m0/mf  |  m0 = e^(dv/Ve) / mf
 
