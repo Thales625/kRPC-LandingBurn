@@ -52,7 +52,7 @@ class LandingBurn:
         
         # Params
         self.tilted_engines = False
-        self.gear_delay = 3
+        self.gear_delay = 8
         self.max_twr = 4
         self.eng_threshold = .9
         self.final_speed = -1
@@ -111,7 +111,7 @@ class LandingBurn:
 
                 a_net = max(a_eng_l - self.a_g, .1) # used to calculate v_target
                 
-                target_dir = vel * -1
+                target_dir = -vel
                 target_dir.x = abs(target_dir.x)
 
                 burn_altitude = (mag_speed**2 - self.final_speed**2 + 2*self.a_g*alt) / (2 * a_eng_l)
@@ -123,12 +123,17 @@ class LandingBurn:
 
                 #required_dv = t_burning * a_eng + t_hovering * self.a_g
 
-                #print(f'TF: {t_fall:.1f} | TB: {t_burning:.1f} | TTB: {t_to_burn:.1f} | TH: {t_hovering:.1f}')
+                #print(f'TF: {t_fall:.1f}')
+
+                #print(f'TF: {t_fall:.1f}')# | TB: {t_burning:.1f} | TTB: {t_to_burn:.1f} | TH: {t_hovering:.1f}')
                 
                 # Throttle Controller
                 if pitch > 0:
-                    if not MULTILANDING and vel.y**2 + vel.z**2 > 900: # hor speed > 30
-                        dist = Vector3(self.stream_position_body()).distance(self.trajectory.land_pos)
+                    if not MULTILANDING:
+                        if vel.y**2 + vel.z**2 > 900: # hor speed > 30
+                            dist = Vector3(self.stream_position_body()).distance(self.trajectory.land_pos)
+                        else:
+                            self.trajectory.end()
                     else:
                         t_free_fall = (vel.x + sqrt(vel.x**2 + 2*self.a_g*alt)) / self.a_g
                         dist = Vector3(-alt, vel.y*t_free_fall, vel.z*t_free_fall).magnitude()
@@ -206,5 +211,5 @@ if __name__ == '__main__':
         from threading import Thread
 
         Thread(target=LandingBurn, args=['sb1']).start()
-        Thread(target=LandingBurn, args=['sb2']).start()
+        Thread(target=LandingBurn, args=['sb3']).start()
     LandingBurn()
