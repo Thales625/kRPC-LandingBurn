@@ -74,7 +74,7 @@ class LandingBurn:
             sleep(0.5)
         
         while self.stream_surface_altitude() > 15000:
-            self.vessel.auto_pilot.target_direction = tuple(Vector3(self.flight_body.velocity) * -1)
+            self.vessel.auto_pilot.target_direction = Vector3(self.flight_body.velocity) * -1
             sleep(0.5)
 
         # Trajectory
@@ -153,7 +153,7 @@ class LandingBurn:
                     self.vessel.control.throttle = 0
 
                 # Aim Vessel
-                self.vessel.auto_pilot.target_direction = self.space_center.transform_direction(tuple(target_dir), self.surface_ref, self.body_ref)
+                self.vessel.auto_pilot.target_direction = self.space_center.transform_direction(target_dir, self.surface_ref, self.body_ref)
         
         except KeyboardInterrupt as e:
             if not MULTILANDING:

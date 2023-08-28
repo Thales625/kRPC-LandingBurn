@@ -66,7 +66,7 @@ class Trajectory:
 
         # drag force
         if self.has_atm and 0 < (dist - self.rb) < self.atm_depth:
-            alt = self.body.altitude_at_position(tuple(pos), self.body_ref)
+            alt = self.body.altitude_at_position(pos, self.body_ref)
             pho = 1.113 * exp(-1.24 / 10000 * alt) # kerbin atm density
             v_mag = self.v[-1].magnitude()
             f_drag = self.c*pho*v_mag**2
@@ -99,14 +99,14 @@ class Trajectory:
                 self.v.append(self.v[-1] + dv)
                 self.r.append(self.r[-1] + dr)
                 
-                # if step % self.step_check_ground == 0 and (self.r[-1].magnitude() < self.rb and self.alt_at_pos(tuple(self.r[-1])) <= 0):
-                # if step % self.step_check_ground == 0 and self.alt_at_pos(tuple(self.r[-1]) <= 0):
-                if step % self.step_check_ground == 0 and (self.r[-1].magnitude() < self.rb and self.alt_at_pos(tuple(self.r[-1])) <= 0):
+                # if step % self.step_check_ground == 0 and (self.r[-1].magnitude() < self.rb and self.alt_at_pos(self.r[-1]) <= 0):
+                # if step % self.step_check_ground == 0 and self.alt_at_pos(self.r[-1] <= 0):
+                if step % self.step_check_ground == 0 and (self.r[-1].magnitude() < self.rb and self.alt_at_pos(self.r[-1]) <= 0):
                     i = -2
-                    alt = self.alt_at_pos(tuple(self.r[i]))
+                    alt = self.alt_at_pos(self.r[i])
                     while alt < 0:
                         i -= 1
-                        alt = self.alt_at_pos(tuple(self.r[i]))
+                        alt = self.alt_at_pos(self.r[i])
 
                     a = self.r[i]
                     b = self.r[i+1]
@@ -119,7 +119,7 @@ class Trajectory:
             if self.draw_trajectory:
                 self.drawing.clear()
                 for i in range(len(self.r)-1):
-                    self.drawing.add_line(tuple(self.r[i]), tuple(self.r[i+1]), self.body_ref)
+                    self.drawing.add_line(self.r[i], self.r[i+1], self.body_ref)
                     
             sleep(0.1)
 
