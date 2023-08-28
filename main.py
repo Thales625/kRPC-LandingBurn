@@ -52,9 +52,9 @@ class LandingBurn:
         
         # Params
         self.tilted_engines = False
-        self.gear_delay = 8
+        self.gear_delay = 4
         self.max_twr = 4
-        self.eng_threshold = .9
+        self.eng_threshold = .8
         self.final_speed = -1
         self.final_altitude = 5
 
@@ -92,11 +92,6 @@ class LandingBurn:
 
         try:
             while True:
-                # Check Landed
-                if self.vessel.situation == self.vessel.situation.landed or self.vessel.situation == self.vessel.situation.splashed:
-                    self.land_func(self)
-                    break
-
                 # Get Streams
                 vel = Vector3(self.stream_vel())
                 alt = self.get_altitude()
@@ -118,34 +113,35 @@ class LandingBurn:
 
                 t_to_burn = (vel.x + sqrt(vel.x**2 + 2*self.a_g*abs(alt - burn_altitude))) / self.a_g
                 t_burning = sqrt(2*abs(burn_altitude) / a_net)
-                t_hovering = min(self.final_altitude, alt) / abs(self.final_speed)
-                t_fall = t_to_burn + t_burning + t_hovering
+                #t_hovering = min(self.final_altitude, alt) / abs(self.final_speed)
+                t_fall = t_to_burn + t_burning# + t_hovering
 
                 #required_dv = t_burning * a_eng + t_hovering * self.a_g
 
-                #print(f'TF: {t_fall:.1f}')
-
-                #print(f'TF: {t_fall:.1f}')# | TB: {t_burning:.1f} | TTB: {t_to_burn:.1f} | TH: {t_hovering:.1f}')
+                #print(f'TF: {t_fall:.1f}' | TB: {t_burning:.1f} | TTB: {t_to_burn:.1f} | TH: {t_hovering:.1f}')
                 
                 # Throttle Controller
                 if pitch > 0:
-                    if not MULTILANDING:
-                        if vel.y**2 + vel.z**2 > 900: # hor speed > 30
-                            dist = Vector3(self.stream_position_body()).distance(self.trajectory.land_pos)
-                        else:
-                            self.trajectory.end()
-                    else:
+                    if MULTILANDING or vel.y**2 + vel.z**2 < 900:
                         t_free_fall = (vel.x + sqrt(vel.x**2 + 2*self.a_g*alt)) / self.a_g
                         dist = Vector3(-alt, vel.y*t_free_fall, vel.z*t_free_fall).magnitude()
-                    
+                        if not MULTILANDING: self.trajectory.end()
+                    else:
+                        dist = Vector3(self.stream_position_body()).distance(self.trajectory.land_pos)
+
                     if alt > self.final_altitude:
                         target_speed = sqrt(self.final_speed**2 + 2*a_net*abs(dist-self.final_altitude))
                         delta_speed = mag_speed - target_speed
-                        throttle = (delta_speed*10 + self.a_g) / a_eng
+                        throttle = (delta_speed*5 + self.a_g) / a_eng
                     else: # Final Burn
                         target_dir.x *= 15
                         delta_speed = self.final_speed - vel.x
                         throttle = (delta_speed*2 + self.a_g) / a_eng
+
+                        # Check Landed
+                        if self.vessel.situation == self.vessel.situation.landed or self.vessel.situation == self.vessel.situation.splashed:
+                            self.land_func(self)
+                            break
 
                     self.vessel.control.throttle = throttle
             
