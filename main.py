@@ -10,7 +10,7 @@ MULTILANDING = False
 
 class LandingBurn:
     def __init__(self, vessel_tag=None, land_func=None):
-        self.conn = krpc.connect('LandingBurn' + ((': ' + vessel_tag) if vessel_tag else ''))
+        self.conn = krpc.connect("LandingBurn" + ((": " + vessel_tag) if vessel_tag else ""))
         self.space_center = self.conn.space_center
         self.vessel = self.space_center.active_vessel
         if vessel_tag:
@@ -193,19 +193,19 @@ class LandingBurn:
             self.vessel.auto_pilot.disengage()
 
     def finish(self):
+        self.vessel.control.rcs = True
         self.vessel.control.brakes = False
-        self.vessel.control.rcs = False
-        print(f'{self.vessel.name} has landed!')
+        print(f"{self.vessel.name} has landed!")
         self.conn.close()
 
     def get_altitude(self):
         return max(0, self.stream_surface_altitude() + self.vessel.bounding_box(self.surface_ref)[0][0])
     
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if MULTILANDING:
         from threading import Thread
 
-        Thread(target=LandingBurn, args=['sb1']).start()
-        Thread(target=LandingBurn, args=['sb2']).start()
+        Thread(target=LandingBurn, args=["sb1"]).start()
+        Thread(target=LandingBurn, args=["sb2"]).start()
     LandingBurn()

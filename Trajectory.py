@@ -4,13 +4,11 @@ from threading import Thread
 from time import sleep
 #from numba import jit
 
-from sys import path
-path.append('D:\Codes\www\Vector')
 from Vector import Vector3
 
 class Trajectory:
     def __init__(self) -> None:
-        self.conn = krpc.connect('Trajectory')
+        self.conn = krpc.connect("Trajectory")
         self.space_center = self.conn.space_center
         self.vessel = self.space_center.active_vessel
         self.body = self.vessel.orbit.body
@@ -99,8 +97,6 @@ class Trajectory:
                 self.v.append(self.v[-1] + dv)
                 self.r.append(self.r[-1] + dr)
                 
-                # if step % self.step_check_ground == 0 and (self.r[-1].magnitude() < self.rb and self.alt_at_pos(self.r[-1]) <= 0):
-                # if step % self.step_check_ground == 0 and self.alt_at_pos(self.r[-1] <= 0):
                 if step % self.step_check_ground == 0 and (self.r[-1].magnitude() < self.rb and self.alt_at_pos(self.r[-1]) <= 0):
                     i = -2
                     alt = self.alt_at_pos(self.r[i])
