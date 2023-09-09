@@ -54,7 +54,7 @@ class LandingBurn:
         self.tilted_engines = False
         self.gear_delay = 4
         self.max_twr = 4
-        self.eng_threshold = .8
+        self.eng_threshold = .9
         self.final_speed = -1
         self.final_altitude = 5
 
@@ -207,5 +207,5 @@ if __name__ == '__main__':
         from threading import Thread
 
         Thread(target=LandingBurn, args=['sb1']).start()
-        Thread(target=LandingBurn, args=['sb3']).start()
+        Thread(target=LandingBurn, args=['sb2']).start()
     LandingBurn()
