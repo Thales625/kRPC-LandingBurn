@@ -12,8 +12,8 @@ USE_TRAJECTORY = False
 if MULTILANDING: USE_TRAJECTORY = False
 
 class LandingBurn:
-    def __init__(self, vessel_tag=None, land_func=None, address=None):
-        self.conn = krpc.connect("LandingBurn" + ((": " + vessel_tag) if vessel_tag else ""), address=address if (address is not MULTILANDING and not None) else None)
+    def __init__(self, vessel_tag=None, land_func=None):
+        self.conn = krpc.connect("LandingBurn" + ((": " + vessel_tag) if vessel_tag else ""))
         self.space_center = self.conn.space_center
         self.vessel = self.space_center.active_vessel
         if vessel_tag:
@@ -24,12 +24,11 @@ class LandingBurn:
         self.control = self.vessel.control
         self.auto_pilot = self.vessel.auto_pilot
         self.body = self.vessel.orbit.body
+
         self.body_ref = self.body.reference_frame
         self.surface_ref = self.vessel.surface_reference_frame
-        self.hybrid_ref = self.space_center.ReferenceFrame.create_hybrid(
-            position=self.body_ref,
-            rotation=self.surface_ref
-        )
+        self.hybrid_ref = self.space_center.ReferenceFrame.create_hybrid(position=self.body_ref, rotation=self.surface_ref)
+
         self.flight_body = self.vessel.flight(self.body_ref)
         self.flight_surface = self.vessel.flight(self.surface_ref)
         self.flight_hybrid = self.vessel.flight(self.hybrid_ref)
@@ -44,6 +43,7 @@ class LandingBurn:
         self.stream_situation = self.conn.add_stream(getattr, self.vessel, "situation")
 
         # ===================
+        
         if land_func is None:
             self.land_func = lambda self: (
                 self.end_trajectory(),
@@ -53,18 +53,19 @@ class LandingBurn:
         else:
             self.land_func = land_func
 
-        # consts
-        self.a_g = self.body.surface_gravity
-        self.landed_situation = self.vessel.situation.landed
-        self.splashed_situation = self.vessel.situation.splashed
-
         # Params
-        self.tilted_engines = True
+        self.tilted_engines = False
         self.gear_delay = 4
         self.max_twr = 4
         self.eng_threshold = .9
         self.final_speed = -1
         self.final_altitude = 5
+
+        # Consts
+        self.a_g = self.body.surface_gravity
+        self.landed_situation = self.vessel.situation.landed
+        self.splashed_situation = self.vessel.situation.splashed
+        self.vf_2 = self.final_speed*abs(self.final_speed)
 
         # Initializing
         self.control.throttle = 0
@@ -115,10 +116,11 @@ class LandingBurn:
                 target_dir = -vel
                 target_dir.x = abs(target_dir.x)
 
-                burn_altitude = (mag_speed**2 - self.final_speed**2 + 2*self.a_g*alt) / (2 * a_eng_l)
+                burn_altitude = abs((mag_speed**2 + self.vf_2 + 2*self.a_g*alt) / (2 * a_eng_l))
 
-                t_to_burn = (vel.x + sqrt(vel.x**2 + 2*self.a_g*abs(alt - burn_altitude))) / self.a_g
-                t_burning = sqrt(2*abs(burn_altitude) / a_net)
+                v_2 = vel.x*abs(vel.x) # auxiliar math variable
+                t_to_burn = (vel.x + sqrt(max(0, 2*self.a_g*(alt - burn_altitude) - v_2))) / self.a_g
+                t_burning = sqrt((2*burn_altitude) / a_net)
                 #t_hovering = min(self.final_altitude, alt) / abs(self.final_speed)
                 t_fall = t_to_burn + t_burning# + t_hovering
 
@@ -131,7 +133,7 @@ class LandingBurn:
                     if USE_TRAJECTORY and vel.y**2 + vel.z**2 > 900:
                         dist = Vector3(self.stream_position_body()).distance(self.trajectory.land_pos)
                     else:
-                        t_free_fall = (vel.x + sqrt(vel.x**2 + 2*self.a_g*alt)) / self.a_g
+                        t_free_fall = (vel.x + sqrt(max(0, 2*self.a_g*alt - v_2))) / self.a_g
                         dist = Vector3(-alt, vel.y*t_free_fall, vel.z*t_free_fall).magnitude()
                         self.end_trajectory()
 
@@ -214,9 +216,4 @@ if __name__ == "__main__":
         Thread(target=LandingBurn, args=["sb1"]).start()
         Thread(target=LandingBurn, args=["sb2"]).start()
 
-    def land_func(connection):
-        connection.control.throttle = 1
-        connection.control.activate_next_stage()
-        connection.finish()
-
-    LandingBurn(address="192.168.50.114")
+    LandingBurn()
