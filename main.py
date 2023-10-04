@@ -5,11 +5,15 @@ from math import sqrt
 from Vector import Vector3
 
 from Trajectory import Trajectory
+from DataLogger import DataLogger
 
 MULTILANDING = False
-USE_TRAJECTORY = False
+USE_TRAJECTORY = False # conflict with EVE mod
+LOG_DATA = True
 
-if MULTILANDING: USE_TRAJECTORY = False
+if MULTILANDING: 
+    USE_TRAJECTORY = False
+    LOG_DATA = False
 
 class LandingBurn:
     def __init__(self, vessel_tag=None, land_func=None):
@@ -39,14 +43,16 @@ class LandingBurn:
         self.stream_vel = self.conn.add_stream(getattr, self.flight_hybrid, "velocity")
         self.stream_position_body = self.conn.add_stream(self.vessel.position, self.body_ref)
         self.stream_surface_altitude = self.conn.add_stream(getattr, self.flight_body, "surface_altitude")
+        self.stream_bbox = self.conn.add_stream(self.vessel.bounding_box, self.surface_ref)
         self.stream_pitch = self.conn.add_stream(getattr, self.flight_surface, "pitch")
         self.stream_situation = self.conn.add_stream(getattr, self.vessel, "situation")
+        if LOG_DATA: self.stream_ut = self.conn.add_stream(getattr, self.space_center, "ut")
 
         # ===================
         
         if land_func is None:
             self.land_func = lambda self: (
-                self.end_trajectory(),
+                self.end_modules(),
                 self.progressive_engine_cut(),
                 self.sas_aim_up(),
                 self.finish())
@@ -85,17 +91,21 @@ class LandingBurn:
         while self.stream_surface_altitude() > 15000:
             self.auto_pilot.target_direction = Vector3(self.flight_body.velocity) * -1
             sleep(0.5)
-
+        
         # Trajectory
         if USE_TRAJECTORY:
             self.trajectory = Trajectory()
             self.trajectory.start()
+            
+        # Data Logger
+        if LOG_DATA:
+            self.data_log = DataLogger()
+            self.data_log.ut0 = self.stream_ut()
 
         # Thrust correction
         self.thrust = 0
-        for engine in self.vessel.parts.engines:
-            if engine.active and engine.has_fuel:
-                self.thrust += engine.available_thrust * engine.part.direction(self.vessel.reference_frame)[1]
+        if self.tilted_engines:
+            self.thrust = sum([eng.available_thrust * eng.part.direction(self.vessel.reference_frame)[1] for eng in self.vessel.parts.engines if (eng.active and eng.has_fuel)])
 
         try:
             while True:
@@ -106,10 +116,12 @@ class LandingBurn:
                 av_thrust = self.thrust if self.tilted_engines else self.stream_av_thrust()
                 pitch = self.stream_pitch()
 
+                hor_speed = sqrt(vel.y**2 + vel.z**2)
                 mag_speed = vel.magnitude()
+                delta_speed = 0
                 
                 a_eng = av_thrust / mass
-                a_eng_l = a_eng * self.eng_threshold * min(self.max_twr * self.a_g / a_eng, 1)
+                a_eng_l = a_eng * self.eng_threshold# * min(self.max_twr * self.a_g / a_eng, 1)
 
                 a_net = max(a_eng_l - self.a_g, .1) # used to calculate v_target
                 
@@ -130,12 +142,12 @@ class LandingBurn:
                 
                 # Throttle Controller
                 if pitch > 0:
-                    if USE_TRAJECTORY and vel.y**2 + vel.z**2 > 900:
+                    if USE_TRAJECTORY and hor_speed > 30:
                         dist = Vector3(self.stream_position_body()).distance(self.trajectory.land_pos)
                     else:
                         t_free_fall = (vel.x + sqrt(max(0, 2*self.a_g*alt - v_2))) / self.a_g
                         dist = Vector3(-alt, vel.y*t_free_fall, vel.z*t_free_fall).magnitude()
-                        self.end_trajectory()
+                        if USE_TRAJECTORY: self.trajectory.end()
 
                     if alt > self.final_altitude:
                         target_speed = sqrt(self.final_speed**2 + 2*a_net*abs(dist-self.final_altitude))
@@ -164,11 +176,17 @@ class LandingBurn:
                 # Aim Vessel
                 self.auto_pilot.target_direction = self.space_center.transform_direction(target_dir, self.surface_ref, self.body_ref)
         
-        except KeyboardInterrupt as e:
-            self.end_trajectory()
+                # Log Data
+                if LOG_DATA:
+                    self.data_log.log(self.stream_ut(), alt, vel.x, hor_speed, delta_speed, pitch)
 
-    def end_trajectory(self):
+
+        except KeyboardInterrupt as e:
+            self.end_modules()
+
+    def end_modules(self):
         if USE_TRAJECTORY: self.trajectory.end()
+        if LOG_DATA: self.data_log.close()
 
     def progressive_engine_cut(self):
         a_eng = (self.thrust if self.tilted_engines else self.stream_av_thrust()) / self.stream_mass()
@@ -207,7 +225,7 @@ class LandingBurn:
         self.conn.close()
 
     def get_altitude(self):
-        return max(0, self.stream_surface_altitude() + self.vessel.bounding_box(self.surface_ref)[0][0])
+        return max(0, self.stream_surface_altitude() + self.stream_bbox()[0][0])
     
 
 if __name__ == "__main__":
