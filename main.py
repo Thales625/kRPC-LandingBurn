@@ -2,14 +2,16 @@ import krpc
 from time import sleep
 from math import sqrt
 
+from sys import path
+path.append('D:\Codes\www\Vector')
 from Vector import Vector3
 
 from Trajectory import Trajectory
 from DataLogger import DataLogger
 
 MULTILANDING = False
-USE_TRAJECTORY = False # conflict with EVE mod
-LOG_DATA = True
+USE_TRAJECTORY = False # conflict with SCATTERER mod
+LOG_DATA = False
 
 if MULTILANDING: 
     USE_TRAJECTORY = False
@@ -121,7 +123,7 @@ class LandingBurn:
                 delta_speed = 0
                 
                 a_eng = av_thrust / mass
-                a_eng_l = a_eng * self.eng_threshold# * min(self.max_twr * self.a_g / a_eng, 1)
+                a_eng_l = a_eng * self.eng_threshold * min(self.max_twr * self.a_g / a_eng, 1)
 
                 a_net = max(a_eng_l - self.a_g, .1) # used to calculate v_target
                 
@@ -154,7 +156,7 @@ class LandingBurn:
                         delta_speed = mag_speed - target_speed
                         throttle = (delta_speed*5 + self.a_g) / a_eng
                     else: # Final Burn
-                        target_dir.x *= 15
+                        target_dir.x *= 10
                         delta_speed = self.final_speed - vel.x
                         throttle = (delta_speed*2 + self.a_g) / a_eng
 
@@ -179,7 +181,6 @@ class LandingBurn:
                 # Log Data
                 if LOG_DATA:
                     self.data_log.log(self.stream_ut(), alt, vel.x, hor_speed, delta_speed, pitch)
-
 
         except KeyboardInterrupt as e:
             self.end_modules()
