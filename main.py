@@ -2,15 +2,13 @@ import krpc
 from time import sleep
 from math import sqrt
 
-from sys import path
-path.append('D:\Codes\www\Vector')
 from Vector import Vector3
 
 from Trajectory import Trajectory
 from DataLogger import DataLogger
 
 MULTILANDING = False
-USE_TRAJECTORY = False # conflict with SCATTERER mod
+USE_TRAJECTORY = False # conflict with some mod
 LOG_DATA = False
 
 if MULTILANDING: 
@@ -37,12 +35,11 @@ class LandingBurn:
 
         self.flight_body = self.vessel.flight(self.body_ref)
         self.flight_surface = self.vessel.flight(self.surface_ref)
-        self.flight_hybrid = self.vessel.flight(self.hybrid_ref)
 
         # Streams
         self.stream_mass = self.conn.add_stream(getattr, self.vessel, "mass")
         self.stream_av_thrust = self.conn.add_stream(getattr, self.vessel, "available_thrust")
-        self.stream_vel = self.conn.add_stream(getattr, self.flight_hybrid, "velocity")
+        self.stream_vel = self.conn.add_stream(self.vessel.velocity, self.hybrid_ref)
         self.stream_position_body = self.conn.add_stream(self.vessel.position, self.body_ref)
         self.stream_surface_altitude = self.conn.add_stream(getattr, self.flight_body, "surface_altitude")
         self.stream_bbox = self.conn.add_stream(self.vessel.bounding_box, self.surface_ref)
@@ -181,6 +178,8 @@ class LandingBurn:
                 # Log Data
                 if LOG_DATA:
                     self.data_log.log(self.stream_ut(), alt, vel.x, hor_speed, delta_speed, pitch)
+
+                sleep(0.05)
 
         except KeyboardInterrupt as e:
             self.end_modules()

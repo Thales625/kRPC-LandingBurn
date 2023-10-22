@@ -12,8 +12,9 @@ class Trajectory:
         self.space_center = self.conn.space_center
         self.vessel = self.space_center.active_vessel
         self.body = self.vessel.orbit.body
+
         self.body_ref = self.body.reference_frame
-        self.flight_body = self.vessel.flight(self.body_ref)
+
         self.drawing = self.conn.drawing
         self.GM = self.body.gravitational_parameter
         self.rb = self.body.equatorial_radius
@@ -23,7 +24,7 @@ class Trajectory:
         # Streams
         self.stream_mass = self.conn.add_stream(getattr, self.vessel, "mass")
         self.stream_pos_body = self.conn.add_stream(self.vessel.position, self.body_ref)
-        self.stream_vel_body = self.conn.add_stream(getattr, self.flight_body, "velocity")
+        self.stream_vel_body = self.conn.add_stream(self.vessel.velocity, self.body_ref)
 
         # Initializing
         self.land_pos = Vector3()
@@ -60,7 +61,7 @@ class Trajectory:
     def rk4(self, pos):
         dist = pos.magnitude()
 
-        accel = -(self.GM/dist**2) * pos.normalize() # gravity
+        accel = -(self.GM * pos / dist**3) # gravity
 
         # drag force
         if self.has_atm and 0 < (dist - self.rb) < self.atm_depth:
@@ -96,14 +97,13 @@ class Trajectory:
 
                 self.v.append(self.v[-1] + dv)
                 self.r.append(self.r[-1] + dr)
-                
-                if step % self.step_check_ground == 0 and (self.r[-1].magnitude() < self.rb and self.alt_at_pos(self.r[-1]) <= 0):
+
+                if step % self.step_check_ground == 0 and (self.r[-1].magnitude() < self.rb*1.5 and self.alt_at_pos(self.r[-1]) <= 0):
                     i = -2
                     alt = self.alt_at_pos(self.r[i])
                     while alt < 0:
                         i -= 1
                         alt = self.alt_at_pos(self.r[i])
-
                     a = self.r[i]
                     b = self.r[i+1]
                     
@@ -111,7 +111,7 @@ class Trajectory:
                     _ = (-a).normalize()
                     self.land_pos = a + ab_dir * (alt / _.dot(ab_dir))
                     break
-            
+                
             if self.draw_trajectory:
                 self.drawing.clear()
                 for i in range(len(self.r)-1):
