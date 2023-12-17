@@ -2,8 +2,8 @@ from datetime import datetime
 
 class DataLogger:
     def __init__(self) -> None:
-        self.format = 'ut|alt|v_vert|v_hor|delta_speed|pitch'
-        self.now = datetime.now().strftime("%d-%m-%Y %H.%M")
+        self.format = 'ut|alt|dist|v_vert|v_hor|delta_speed|pitch'
+        self.now = datetime.now().strftime("%d-%m-%Y.%H:%M")
         self.filename = f"report/{self.now}.txt"
 
         self.file = open(self.filename, "w")

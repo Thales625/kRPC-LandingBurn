@@ -65,6 +65,7 @@ class LandingBurn:
         self.eng_threshold = .9
         self.final_speed = -1
         self.final_altitude = 5
+        self.max_hor_speed = 8
 
         # Consts
         self.a_g = self.body.surface_gravity
@@ -131,7 +132,7 @@ class LandingBurn:
 
                 v_2 = vel.x*abs(vel.x) # auxiliar math variable
                 t_to_burn = (vel.x + sqrt(max(0, 2*self.a_g*(alt - burn_altitude) - v_2))) / self.a_g
-                t_burning = sqrt((2*burn_altitude) / a_net)
+                t_burning = sqrt(2 * burn_altitude / a_net)
                 #t_hovering = min(self.final_altitude, alt) / abs(self.final_speed)
                 t_fall = t_to_burn + t_burning# + t_hovering
 
@@ -153,8 +154,15 @@ class LandingBurn:
                         delta_speed = mag_speed - target_speed
                         throttle = (delta_speed*5 + self.a_g) / a_eng
                     else: # Final Burn
-                        target_dir.x *= 10
-                        delta_speed = self.final_speed - vel.x
+                        if hor_speed > self.max_hor_speed:
+                            target_dir.x *= 8
+                            delta_h = self.final_altitude - alt
+                            v_target = sqrt(2*self.a_g*abs(delta_h)) * (delta_h / abs(delta_h))
+                        else:
+                            target_dir.x *= 10
+                            v_target = self.final_speed
+
+                        delta_speed = v_target - vel.x
                         throttle = (delta_speed*2 + self.a_g) / a_eng
 
                         # Check Landed
