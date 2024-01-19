@@ -150,7 +150,8 @@ class LandingBurn:
                         if USE_TRAJECTORY: self.trajectory.end()
 
                     if alt > self.final_altitude:
-                        target_speed = sqrt(self.final_speed**2 + 2*a_net*abs(dist-self.final_altitude))
+                        _ = 2*a_net*abs(dist-self.final_altitude) - self.vf_2
+                        target_speed = sqrt(_) if _ > 0 else 0
                         delta_speed = mag_speed - target_speed
                         throttle = (delta_speed*5 + self.a_g) / a_eng
                     else: # Final Burn
