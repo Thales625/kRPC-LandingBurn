@@ -2,7 +2,7 @@ import krpc
 from time import sleep
 from math import sqrt
 
-from Vector import Vector3
+from PyVecs import Vector3
 
 from Trajectory import Trajectory
 from DataLogger import DataLogger
