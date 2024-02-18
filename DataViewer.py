@@ -25,6 +25,8 @@ with open("report/" + filename, "r") as file:
     for line in file.readlines()[1:]:
         data = line.strip().split("|")
 
+        print(data)
+
         time.append(float(data[0]))
         altitude.append(float(data[1]))
         dist.append(float(data[2]))

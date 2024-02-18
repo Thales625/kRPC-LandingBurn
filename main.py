@@ -9,11 +9,18 @@ from DataLogger import DataLogger
 
 MULTILANDING = False
 USE_TRAJECTORY = True
-LOG_DATA = False
+LOG_DATA = True
 
-if MULTILANDING: 
-    USE_TRAJECTORY = False
-    LOG_DATA = False
+GEAR_DELAY = 4
+
+MAX_TWR = 4
+ENG_THRESHOLD = .9
+
+MAX_FINAL_HOR_SPEED = 8
+FINAL_SPEED = -1
+FINAL_ALTITUDE = 5
+
+
 
 class LandingBurn:
     def __init__(self, vessel_tag=None, land_func=None):
@@ -58,20 +65,14 @@ class LandingBurn:
         else:
             self.land_func = land_func
 
-        # Params
-        self.tilted_engines = False
-        self.gear_delay = 4
-        self.max_twr = 4
-        self.eng_threshold = .8
-        self.final_speed = -1.5
-        self.final_altitude = 10
-        self.max_hor_speed = 8
+        # Thrust correction
+        self.thrust_correction = min(1, sum([eng.available_thrust * eng.part.direction(self.vessel.reference_frame)[1] for eng in self.vessel.parts.engines if (eng.active and eng.has_fuel)]) / self.stream_av_thrust())
 
         # Consts
         self.a_g = self.body.surface_gravity
         self.landed_situation = self.vessel.situation.landed
         self.splashed_situation = self.vessel.situation.splashed
-        self.vf_2 = self.final_speed*abs(self.final_speed)
+        self.vf_2 = FINAL_SPEED*abs(FINAL_SPEED)
 
         # Initializing
         self.control.throttle = 0
@@ -104,18 +105,13 @@ class LandingBurn:
             self.data_log = DataLogger()
             self.data_log.ut0 = self.stream_ut()
 
-        # Thrust correction
-        self.thrust = 0
-        if self.tilted_engines:
-            self.thrust = sum([eng.available_thrust * eng.part.direction(self.vessel.reference_frame)[1] for eng in self.vessel.parts.engines if (eng.active and eng.has_fuel)])
-
         try:
             while True:
                 # Get Streams
                 vel = Vector3(self.stream_vel())
                 alt = self.get_altitude()
                 mass = self.stream_mass()
-                av_thrust = self.thrust if self.tilted_engines else self.stream_av_thrust()
+                av_thrust = self.stream_av_thrust() * self.thrust_correction
                 pitch = self.stream_pitch()
 
                 hor_speed = sqrt(vel.y**2 + vel.z**2)
@@ -123,7 +119,7 @@ class LandingBurn:
                 delta_speed = 0
                 
                 a_eng = av_thrust / mass
-                a_eng_l = a_eng * self.eng_threshold * min(self.max_twr * self.a_g / a_eng, 1)
+                a_eng_l = a_eng * ENG_THRESHOLD * min(MAX_TWR * self.a_g / a_eng, 1)
 
                 a_net = max(a_eng_l - self.a_g, .1) # used to calculate v_target
                 
@@ -135,7 +131,7 @@ class LandingBurn:
                 v_2 = vel.x*abs(vel.x) # auxiliar math variable
                 t_to_burn = (vel.x + sqrt(max(0, 2*self.a_g*(alt - burn_altitude) - v_2))) / self.a_g
                 t_burning = sqrt(2 * burn_altitude / a_net)
-                #t_hovering = min(self.final_altitude, alt) / abs(self.final_speed)
+                #t_hovering = min(FINAL_ALTITUDE, alt) / abs(FINAL_SPEED)
                 t_fall = t_to_burn + t_burning# + t_hovering
 
                 #required_dv = t_burning * a_eng + t_hovering * self.a_g
@@ -151,19 +147,19 @@ class LandingBurn:
                         dist = Vector3(-alt, vel.y*t_free_fall, vel.z*t_free_fall).magnitude()
                         if USE_TRAJECTORY: self.trajectory.end()
 
-                    if alt > self.final_altitude:
-                        _ = 2*a_net*abs(dist-self.final_altitude) - self.vf_2
+                    if alt > FINAL_ALTITUDE:
+                        _ = 2*a_net*abs(dist-FINAL_ALTITUDE) - self.vf_2
                         target_speed = sqrt(_) if _ > 0 else 0
                         delta_speed = mag_speed - target_speed
                         throttle = (delta_speed*5 + self.a_g) / a_eng
                     else: # Final Burn
-                        if hor_speed > self.max_hor_speed:
+                        if hor_speed > MAX_FINAL_HOR_SPEED:
                             target_dir.x *= 8
-                            delta_h = self.final_altitude - alt
+                            delta_h = FINAL_ALTITUDE - alt
                             v_target = sqrt(2*self.a_g*abs(delta_h)) * (delta_h / abs(delta_h))
                         else:
                             target_dir.x *= 10
-                            v_target = self.final_speed
+                            v_target = FINAL_SPEED
 
                         delta_speed = v_target - vel.x
                         throttle = (delta_speed*2 + self.a_g) / a_eng
@@ -179,7 +175,7 @@ class LandingBurn:
                     #print(f'Alt: {alt:.2f} | Delta: {delta_speed:.2f} | TFall: {t_fall:.2f}')
 
                     # Check Gears
-                    if t_fall < self.gear_delay: self.control.gear = True
+                    if t_fall < GEAR_DELAY: self.control.gear = True
                 else:
                     self.control.throttle = 0
 
@@ -188,7 +184,7 @@ class LandingBurn:
         
                 # Log Data
                 if LOG_DATA:
-                    self.data_log.log(self.stream_ut(), alt, vel.x, hor_speed, delta_speed, pitch)
+                    self.data_log.log(self.stream_ut(), dist, alt, vel.x, hor_speed, delta_speed, pitch)
 
                 sleep(0.05)
 
@@ -200,7 +196,7 @@ class LandingBurn:
         if LOG_DATA: self.data_log.close()
 
     def progressive_engine_cut(self):
-        a_eng = (self.thrust if self.tilted_engines else self.stream_av_thrust()) / self.stream_mass()
+        a_eng = self.stream_av_thrust() * self.thrust_correction / self.stream_mass()
 
         throttle = min((self.a_g / a_eng) *.8, 1)
         total_time = 1
@@ -241,6 +237,9 @@ class LandingBurn:
 
 if __name__ == "__main__":
     if MULTILANDING:
+        USE_TRAJECTORY = False
+        LOG_DATA = False
+        
         from threading import Thread
         Thread(target=LandingBurn, args=["sb1"]).start()
         Thread(target=LandingBurn, args=["sb2"]).start()
