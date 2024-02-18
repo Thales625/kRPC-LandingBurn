@@ -8,7 +8,7 @@ from Trajectory import Trajectory
 from DataLogger import DataLogger
 
 MULTILANDING = False
-USE_TRAJECTORY = False # conflict with some mod
+USE_TRAJECTORY = True
 LOG_DATA = False
 
 if MULTILANDING: 
@@ -62,9 +62,9 @@ class LandingBurn:
         self.tilted_engines = False
         self.gear_delay = 4
         self.max_twr = 4
-        self.eng_threshold = .9
-        self.final_speed = -1
-        self.final_altitude = 5
+        self.eng_threshold = .8
+        self.final_speed = -1.5
+        self.final_altitude = 10
         self.max_hor_speed = 8
 
         # Consts
@@ -91,10 +91,12 @@ class LandingBurn:
         while self.stream_surface_altitude() > 15000:
             self.auto_pilot.target_direction = Vector3(self.flight_body.velocity) * -1
             sleep(0.5)
-        
+
         # Trajectory
+        vessel_radius = 1.5
+        cd = 0.4
         if USE_TRAJECTORY:
-            self.trajectory = Trajectory()
+            self.trajectory = Trajectory(vessel_radius, cd)
             self.trajectory.start()
             
         # Data Logger
