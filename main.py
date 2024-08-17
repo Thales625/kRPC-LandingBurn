@@ -44,21 +44,27 @@ class LandingBurn:
         self.stream_bbox             = self.conn.add_stream(self.vessel.bounding_box, self.surface_ref)
 
         # ===================
-        
-        # Params
-        self.max_twr          = 5 if self.body.has_atmosphere else 10
-        self.thrust_threshold = 1 if self.body.has_atmosphere else 0.98
 
         # Drag
         self.k = DRAG_AREA * DRAG_COEFFICIENT
 
         # Consts
         self.a_g = self.body.surface_gravity
+        self.has_atm = self.body.has_atmosphere
+        if self.has_atm:
+            self.atm_depth = self.body.atmosphere_depth
+            if self.atm_depth == 0:
+                self.atm_depth = 30000
+
         self.landed_situation = self.vessel.situation.landed
         self.splashed_situation = self.vessel.situation.splashed
 
         self.const_g_2   = self.a_g * 2
         self.const_g_inv = 1 / self.a_g
+        
+        # Params
+        self.max_twr          = 5 if self.has_atm else 10
+        self.thrust_threshold = 1 if self.has_atm else 0.98
 
         # Initializing
         self.control.throttle = 0
@@ -133,8 +139,8 @@ class LandingBurn:
 
         # END CHECK
         alt = self.stream_surface_altitude()
-        if self.body.has_atmosphere:
-            if alt < 0.5 * self.body.atmosphere_depth:
+        if self.has_atm:
+            if alt < 0.5 * self.atm_depth:
                 self.phase_controller.next_phase()
             return
         

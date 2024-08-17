@@ -93,7 +93,12 @@ class Trajectory:
         else:
             print("Getting and saving data")
 
-            self.atm_alt_list     = [round(h, 2) for h in np.linspace(0, self.body.atmosphere_depth, 5000)]
+            atm_depth = self.body.atmosphere_depth
+            if atm_depth == 0:
+                atm_depth = 30000
+                print("Atm error! Using 30km atm depth.")
+
+            self.atm_alt_list     = [round(h, 2) for h in np.linspace(0, atm_depth, 5000)]
             self.atm_density_list = [round(self.body.density_at(h), 2) for h in self.atm_alt_list]
 
             makedirs(f"./data/{body_name}")
